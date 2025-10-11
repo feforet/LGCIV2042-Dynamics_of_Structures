@@ -4,7 +4,14 @@ import pandas as pd
 import scipy.signal as sc
 
 
+###########################################
+# === CLASSES POUR SYSTEME ET SIGNAUX === #
+###########################################
+
 class system:
+    """ Classe représentant un système dynamique (accélération, vitesse, déplacement).
+    Peut aussi stocker la période T et le coefficient d’amortissement xi."""
+
     def __init__(self, a, v, u, T=None, xi=None):
         self.a = a
         self.v = v
@@ -14,7 +21,15 @@ class system:
         self.xi = xi
 
 
-class signal:
+class Signal:
+    """
+    Classe représentant un signal temporel u(t).
+    Attributs:
+        u : valeurs du signal
+        t : vecteur temps
+        size : taille du signal
+    """
+
     def __init__(self, u, t):
         self.u = u
         self.t = t
@@ -27,40 +42,49 @@ class signal:
         return self.size
 
     def copy(self):
-        return signal(np.copy(self.u), np.copy(self.t))
+        return Signal(np.copy(self.u), np.copy(self.t))
 
     def trim_index(self, index_0, index_f):
+        """Découpe le signal entre deux indices."""
         return self.u[index_0:index_f], self.t[index_0:index_f]
 
     def trim_time(self, time_0, time_f, precision):
+        """Découpe le signal entre deux instants temporels (avec tolérance de précision)."""
         index_0 = find_value(self.t, time_0, precision)
         index_f = find_value(self.t, time_f, precision)
         return self.u[index_0:index_f], self.t[index_0:index_f]
 
     def trim_signal(self, val_0, val_f, precision):
+        """Découpe le signal entre deux valeurs (ex : amplitude)."""
         index_0 = find_value(self.u, val_0, precision)
         index_f = find_value(self.u, val_f, precision)
         return self.u[index_0:index_f], self.t[index_0:index_f]
 
     def set_to_zeros(self, index_0, index_f):
+        """Met à zéro le signal entre deux indices donnés."""
         new_u = self.u
         for i in range(index_0, index_f):
             new_u[i] = 0
         return new_u
 
-    """ Re-centre le signal par rapport à sa moyenne """
-
     def center_signal(self):
+        """ Re-centre le signal par rapport à sa moyenne """
         u_old = self.u
         self.u = u_old - np.mean(u_old)
 
     def filter(self, freq, type='high'):
+        """Filtrage Butterworth passe-haut ou passe-bas du signal."""
         b, a = sc.butter(2, 0.5 / (0.5 * freq), btype=type)
         new_u = sc.filtfilt(b, a, self.u)
         return new_u
 
 
+###################################
+# === FONCTIONS UTILITAIRES === #
+###################################
+
 def find_value(x, value, precision=0.0):
+    """Recherche l’index d’une valeur donnée dans un vecteur, avec tolérance."""
     index = -1
     for i in range(len(x)):
         if (value - precision) < x[i] < (value + precision):
@@ -79,6 +103,7 @@ def read_data(filename):
 
 
 def plotter(data):
+    """Affiche les signaux d’accélération bruts (ax, ay, az)."""
     for col in data.columns:
         if col.startswith('a'):
             plt.plot(data['time'], data[col], label=col[1])
@@ -94,34 +119,25 @@ def plotter(data):
 
 
 def data_to_signals(data):
-    ax_init = data['ax']
-    ay_init = data['ay']
-    az_init = data['az']
-    t_init = data['time']
-
-    ax_vect = np.array(ax_init)
-    ay_vect = np.array(ay_init)
-    az_vect = np.array(az_init)
-    t = np.array(t_init)
-
-    ax = signal(ax_vect, t)
-    ay = signal(ay_vect, t)
-    az = signal(az_vect, t)
-
+    """Convertit les colonnes de DataFrame en objets signal."""
+    ax = Signal(np.array(data['ax']), np.array(data['time']))
+    ay = Signal(np.array(data['ay']), np.array(data['time']))
+    az = Signal(np.array(data['az']), np.array(data['time']))
     return ax, ay, az
 
 
 def clean_signals(signals, t0, tf, precision):
+    """Découpe un ensemble de signaux sur la plage temporelle [t0, tf]."""
     new_signals = np.empty(len(signals), dtype=object)  # tableau d’objets
     for i in range(len(signals)):
         x = signals[i]
         u, t = x.trim_time(t0, tf, precision)
-        new_signals[i] = signal(u, t)
+        new_signals[i] = Signal(u, t)
     return new_signals
 
 
-# Intégration trapézoïdale cumulée (vitesse et déplacement)
 def integrate_trapezoid(x, dt, x0=0.0):
+    """Intégration trapézoïdale cumulée."""
     y = np.zeros(len(x))
     for i in range(len(x) - 1):
         y[i] = y[i - 1] + (x[i] + x[i - 1]) * dt / 2
@@ -133,6 +149,7 @@ def integrate_trapezoid(x, dt, x0=0.0):
 #######################################
 
 def get_ux(data, optionFilter):
+    """Full pipeline to compute ux (displacement) from acceleration data."""
     ax, _, _, = data_to_signals(data)
 
     # ----- 1.1 Suppression de la moyenne et tendance linéaire -----
@@ -144,7 +161,7 @@ def get_ux(data, optionFilter):
 
     # ----- 2. Integration numérique de ax -----
     velocity = integrate_trapezoid(ax.u, dt, 0.0)  # Vitesse (v(0) = 0)
-    vx = signal(velocity, ax.t)
+    vx = Signal(velocity, ax.t)
 
     # ----- 2.1 Traitement du signal vx -----
     if optionFilter:
@@ -153,7 +170,7 @@ def get_ux(data, optionFilter):
 
     # ----- 3. Integration numérique de vx -----
     disp = integrate_trapezoid(vx.u, dt, 0.0)  # Déplacement relatif
-    ux = signal(disp, vx.t)
+    ux = Signal(disp, vx.t)
 
     # ----- 3.1 Traitement du signal ux -----
     if optionFilter:
@@ -200,9 +217,16 @@ def plot_signals(ax, vx, ux):
 
 
 def get_u0(ux):
+    """
+    Estimate initial displacement u0 from displacement signal ux.
+    Steps:
+        - trim the signal to the stable oscillation zone
+        - remove DC offset
+        - take maximum absolute value
+    """
     # Trim  signal of the instable  ascillation (at the beginning and the end)
     ux_trim, t_trim = ux.trim_time(cleaning_t0, cleaning_tf, 0.001)
-    u_trim = signal(ux_trim, t_trim)
+    u_trim = Signal(ux_trim, t_trim)
 
     # Centering the trimmed signal
     ux_trim = ux_trim - np.mean(ux_trim)
@@ -245,6 +269,7 @@ def plot_u0(ux, ux_trim):
 ################################################
 
 def get_natural_frequency(ax):
+    """Estimate natural frequency from acceleration signal."""
     [ax_trim] = clean_signals([ax], cleaning_t0, cleaning_tf, 0.001)
 
     # Estimated period
@@ -262,6 +287,7 @@ def get_natural_frequency(ax):
 
 
 def plot_natural_freq(ax, T_values):
+    """Affiche le signal avec ses pics/troughs détectés et histogramme des périodes."""
     [ax_trim] = clean_signals([ax], cleaning_t0, cleaning_tf, 0.001)
 
     if showPlot:
@@ -289,6 +315,7 @@ def plot_natural_freq(ax, T_values):
 
 
 def compute_experimental_signals_on_dtVal(ax, vx, ux, dt_val):
+    """Estimate damping ratio xi using logarithmic decrement method."""
     # ===== 1. Experimental data =====
     # ----- 1. Trim the signals to [cleaning_t0, cleaning_tf] -----
     [ax_trim, vx_trim, ux_trim] = clean_signals([ax, vx, ux], cleaning_t0, cleaning_tf, 0.001)
@@ -361,17 +388,18 @@ def compute_experimental_signals_on_dtVal(ax, vx, ux, dt_val):
 
 
 def plot_free_undamped_syst_comparison(ax_t20, vx_t20, ux_t20, omega, dt_val, u0, v0=0.0, saveFig=False):
+    """Compute theorical response (with omega given) & compare therical-experiment ax, vx, ux"""
     # ----- Theoretical response of free undamped system -----
     t = np.linspace(0, dt_val, len(ux_t20))
     u = u0 * np.cos(omega * t) + (v0 / omega) * np.sin(omega * t)
     v = - u0 * omega * np.sin(omega * t) + v0 * np.cos(omega * t)
     a = - omega_th ** 2 * u
 
-    a_th = signal(a, t)
-    v_th = signal(v, t)
-    u_th = signal(u, t)
+    a_th = Signal(a, t)
+    v_th = Signal(v, t)
+    u_th = Signal(u, t)
 
-    # ----- Plotting comparison theory (with omega_th) and experiment -----
+    # ----- Plotting comparison theory (with omega) and experiment -----
     if showPlot:
         fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(8, 6))
         axes[0].set_title(f'Free undamped system:\nComparison theorical(omega={omega:.3f}) - experimental response')
@@ -409,6 +437,8 @@ def plot_free_undamped_syst_comparison(ax_t20, vx_t20, ux_t20, omega, dt_val, u0
 ####################################
 
 def get_damping_coeff(ax, peaks, troughs):
+    """Calcule le rapport d’amortissement ξ par la méthode du décrément logarithmique.
+    Utilise les maxima et minima du signal pour plus de robustesse."""
     [ax_trim] = clean_signals([ax], cleaning_t0, cleaning_tf, 0.001)
 
     delta_peaks = np.zeros(len(peaks) - 1)
@@ -431,6 +461,7 @@ def get_damping_coeff(ax, peaks, troughs):
 
 
 def plot_hist_xi(xi_peaks, xi_troughs):
+    """Plot histogram of damping ratios estimated from peaks and troughs."""
     if showPlot:
         # Histogram of xi values for peaks and troughs
         plt.hist(xi_peaks, bins=100, edgecolor='black', label="xi_peaks")
@@ -451,6 +482,17 @@ def plot_hist_xi(xi_peaks, xi_troughs):
 ###################################
 
 def damped_response(dt_val, xi, omega, u0, v0=0.0):
+    """
+    Compute theoretical response of a damped oscillator.
+    Parameters:
+        dt_val (float): duration [s]
+        xi (float): damping ratio
+        omega (float): natural pulsation [rad/s]
+        u0 (float): initial displacement
+        v0 (float): initial velocity (default 0)
+    Returns:
+        a_theo, v_theo, u_theo as signal objects
+    """
     t = np.linspace(0, dt_val, 1000)
 
     # Suppose under-damped
@@ -470,14 +512,18 @@ def damped_response(dt_val, xi, omega, u0, v0=0.0):
                                    B * (-omega_d ** 2 * np.sin(omega_d * t) - 2 * xi * omega * omega_d * np.cos(
                 omega_d * t) + (xi * omega) ** 2 * np.sin(omega_d * t)))
 
-    u_new = signal(u, t)
-    v_new = signal(v, t)
-    a_new = signal(a, t)
+    u_new = Signal(u, t)
+    v_new = Signal(v, t)
+    a_new = Signal(a, t)
 
     return a_new, v_new, u_new
 
 
 def plot_damped_response(ax, vx, ux, a_th, v_th, u_th, T):
+    """
+    Compare experimental and theoretical damped system responses.
+    Displays acceleration, velocity, displacement vs time.
+    """
     t_over_T = ux.t / T
 
     if showPlot:
