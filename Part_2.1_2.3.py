@@ -124,7 +124,7 @@ def plot_compare_th_exp(k_val, data_exp, data_exp_length, colours):
 
 
 # ========== PARAMETERS ==========
-repository = "Figures/Part2"
+repository = "Figures"
 showPlot2 = True
 saveFig2 = False
 
