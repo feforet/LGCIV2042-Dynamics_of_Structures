@@ -104,18 +104,20 @@ def read_data(filename):
 
 def plotter(data):
     """Affiche les signaux d’accélération bruts (ax, ay, az)."""
-    for col in data.columns:
-        if col.startswith('a'):
-            plt.plot(data['time'], data[col], label=col[1])
+    if showPlot:
+        for col in data.columns:
+            if col.startswith('a'):
+                plt.plot(data['time'], data[col], label=col[1])
 
-    plt.title('Raw data')
-    plt.xlabel('Time [s]')
-    plt.ylabel('Acceleration [m/s^2]')
-    plt.grid()
-    plt.legend()
-    if saveFig:
-        plt.savefig("Figures/Plot_acceleration_init")
-    plt.show()
+        plt.title('Raw data')
+        plt.xlabel('Time [s]')
+        plt.ylabel('Acceleration [m/s^2]')
+        plt.grid()
+        plt.legend()
+        if saveFig:
+            plt.savefig("Figures/Plot_acceleration_init")
+        print("\tPLOT - plotter")
+        plt.show()
 
 
 def data_to_signals(data):
@@ -150,22 +152,23 @@ def integrate_trapezoid(x, dt, x0=0.0):
 
 def get_ux(data, optionFilter):
     """Full pipeline to compute ux (displacement) from acceleration data."""
-    ax, _, _, = data_to_signals(data)
+    ax_init, _, _, = data_to_signals(data)
+    [ax] = clean_signals([ax_init], cleaning_t0, cleaning_tf, 0.001)
 
-    # ----- 1.1 Suppression de la moyenne et tendance linéaire -----
+    # ----- 1.1 Traitement du signal ax -----
     ax.center_signal()
-
-    # ----- 1.2 Filtrage passe-haut pour supprimer le bruit basses fréquences -----
     if optionFilter:
-        ax.u = ax.filter(fs, 'high')
+        pass
+        # ax.u = ax.filter(fs, 'high')
 
     # ----- 2. Integration numérique de ax -----
     velocity = integrate_trapezoid(ax.u, dt, 0.0)  # Vitesse (v(0) = 0)
     vx = Signal(velocity, ax.t)
 
     # ----- 2.1 Traitement du signal vx -----
+    [vx_trim] = clean_signals([vx], cleaning_t0 + 5, cleaning_tf - 1, 0.001)
+    vx.u = vx.u - np.mean(vx_trim.u)
     if optionFilter:
-        vx.center_signal()
         vx.u = vx.filter(fs, 'high')
 
     # ----- 3. Integration numérique de vx -----
@@ -173,32 +176,65 @@ def get_ux(data, optionFilter):
     ux = Signal(disp, vx.t)
 
     # ----- 3.1 Traitement du signal ux -----
+    [ux_trim] = clean_signals([ux], cleaning_t0 + 10, cleaning_tf - 2, 0.001)
+    ux.u = ux.u - np.mean(ux_trim.u)
     if optionFilter:
-        ux.center_signal()
+        pass
         # ux.u = ux.filter(fs, 'high')
 
     return ax, vx, ux
 
 
-def plot_signals(ax, vx, ux):
-    if (showPlot):
-        # Compare 3 signals (ax, vx, ux)
+def plot_comparison_with_without_filter(ax_filter, vx_filter, ux_filter, ax_nonFilter, vx_nonFilter, ux_nonFilter):
+    """ Compare signals obtained with and without filtering."""
+    if showPlot:
+
+        # Plot 3 signals
+        fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(8, 6))
+        axes[0].set_title("Comparison of obtained signals with and without filtering")
+
+        axes[0].plot(ax_filter.t, ax_filter.u, label="ax [m/s²] (filtered)", color='purple', lw=1)
+        axes[0].plot(ax_nonFilter.t, ax_nonFilter.u, label="ax [m/s²] (non-filtered)", color='orange', lw=0.5,
+                     linestyle='--')
+        axes[1].plot(vx_filter.t, vx_filter.u, label="vx [m/s] (filtered)", color='green', lw=1)
+        axes[1].plot(vx_nonFilter.t, vx_nonFilter.u, label="vx [m/s] (non-filtered)", color='orange', lw=0.5,
+                     linestyle='--')
+        axes[2].plot(ux_filter.t, ux_filter.u, label="ux [m] (filtered)", color='blue', lw=1)
+        axes[2].plot(ux_nonFilter.t, ux_nonFilter.u, label="ux [m] (non-filtered)", color='orange', lw=0.5, linestyle='--')
+
+        axes[-1].set_xlabel('Time [s]')
+        for axe in axes:
+            axe.set_xlim(left=0)
+            axe.legend(loc='upper right')
+            axe.grid()
+
+        plt.tight_layout()
+        plt.subplots_adjust(hspace=0.3)  # space between plot
+        if saveFig:
+            plt.savefig(f"Figures/Q1.2_Compare_with_without_filter.png")
+        plt.show()
+
+
+def plot_signals(ax, vx, ux, title=""):
+    # Compare 3 signals (ax, vx, ux)
+    if showPlot:
         plt.figure(figsize=(8, 6))
         plt.plot(ax.t, ax.u, label="ax [m/s²]", color='purple', lw=1)
         plt.plot(vx.t, vx.u, label="vx [m/s]", color='green', lw=1)
         plt.plot(ux.t, ux.u, label="ux [m]", color='blue', lw=1)
 
-        plt.title('Acceleration, velocity and displacement')
+        plt.title(f'{title} - Acceleration, velocity and displacement')
         plt.xlabel('Time [s]')
         plt.xlim(left=0)
         plt.legend(loc='upper right')
         plt.grid()
         if saveFig:
-            plt.savefig("Figures/Q1.2_Compare_ax_vx_ux_together.png")
+            plt.savefig(f"Figures/Q1.2_Compare_ax_vx_ux_together_{title}.png")
         plt.show()
 
         # Plot 3 signals
         fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(8, 6))
+        axes[0].set_title(title)
         axes[0].plot(ax.t, ax.u, label="ax [m/s²]", color='purple', lw=1)
         axes[1].plot(vx.t, vx.u, label="vx [m/s]", color='green', lw=1)
         axes[2].plot(ux.t, ux.u, label="ux [m]", color='blue', lw=1)
@@ -212,7 +248,7 @@ def plot_signals(ax, vx, ux):
         plt.tight_layout()
         plt.subplots_adjust(hspace=0.3)  # space between plot
         if saveFig:
-            plt.savefig("Figures/Q1.2_Compute_ax_vx_ux.png")
+            plt.savefig(f"Figures/Q1.2_Compute_ax_vx_ux_{title}.png")
         plt.show()
 
 
@@ -224,19 +260,22 @@ def get_u0(ux):
         - remove DC offset
         - take maximum absolute value
     """
-    # Trim  signal of the instable  ascillation (at the beginning and the end)
-    ux_trim, t_trim = ux.trim_time(cleaning_t0, cleaning_tf, 0.001)
+    # Trim  signal of the instable oscillation due to integration errors
+    # (at the beginning and the end)
+    t0_trim = 11
+    tf_trim = 119
+    ux_trim, t_trim = ux.trim_time(t0_trim, tf_trim, 0.001)
     u_trim = Signal(ux_trim, t_trim)
 
     # Centering the trimmed signal
     ux_trim = ux_trim - np.mean(ux_trim)
     u0 = np.max(abs(ux_trim))
 
-    return u0, u_trim
+    return u0, u_trim, t0_trim, tf_trim
 
 
-def plot_u0(ux, ux_trim):
-    if (showPlot):
+def plot_u0(u0, ux, ux_trim):
+    if showPlot:
         fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(8, 6))
 
         # Plot original signal
@@ -247,7 +286,7 @@ def plot_u0(ux, ux_trim):
 
         # Plot trimmed signal
         axes[1].set_title('Trimmed signal to estimate u0')
-        axes[1].plot(u_trim.t, ux_trim.u, label="ux_trim [m/s]", color='pink', lw=1)
+        axes[1].plot(ux_trim.t, ux_trim.u, label="ux_trim [m/s]", color='pink', lw=1)
         axes[1].axhline(y=u0, color='r', linestyle='--', label='u0 max={:.3f}'.format(u0), lw=1)
         axes[1].axhline(y=-u0, color='r', linestyle='--', lw=1)
 
@@ -269,29 +308,41 @@ def plot_u0(ux, ux_trim):
 ################################################
 
 def get_natural_frequency(ax):
-    """Estimate natural frequency from acceleration signal."""
-    [ax_trim] = clean_signals([ax], cleaning_t0, cleaning_tf, 0.001)
+    """Estimate natural frequency from acceleration signal.
+        :return
+            T_mean = Average period of all the period values, T_values
+            T_values = period values from differences between
+            peaks & troughs = index of the peaks/troughs of signal ax
+    """
 
     # Estimated period
-    T_guess = T_th  # here ~0.41 [s]
+    T_guess = T_th  # here ~0.409 [s]
     min_distance = int(0.8 * T_guess / dt)  # at least 80% of T between 2 pics
     # Detect maxima
-    peaks, _ = sc.find_peaks(ax_trim.u, distance=min_distance, prominence=0.05)
+    peaks, _ = sc.find_peaks(ax.u, distance=min_distance, prominence=0.05)
     # Detect minim (invert signal)
-    troughs, _ = sc.find_peaks(-ax_trim.u, distance=min_distance, prominence=0.05)
+    troughs, _ = sc.find_peaks(-ax.u, distance=min_distance, prominence=0.05)
 
-    T_values = np.diff(ax_trim.t[peaks])  # periods between 2 pics
+    T_values_peaks = np.diff(ax.t[peaks])  # periods between 2 peaks
+    T_values_troughs = np.diff(ax.t[troughs])  # periods between 2 troughs
+    T_values = np.concatenate([T_values_peaks, T_values_troughs])
+
+    T_peaks_mean = np.mean(T_values_peaks)
+    T_troughs_mean = np.mean(T_values_troughs)
     T_mean = np.mean(T_values)
+
+    print(f"Estimated natural period Tn from peaks: {T_peaks_mean}")
+    print(f"Estimated natural period Tn from troughs: {T_troughs_mean}")
 
     return T_mean, T_values, peaks, troughs
 
 
-def plot_natural_freq(ax, T_values):
+def plot_natural_freq(ax, T_values, peaks, troughs):
     """Affiche le signal avec ses pics/troughs détectés et histogramme des périodes."""
     [ax_trim] = clean_signals([ax], cleaning_t0, cleaning_tf, 0.001)
 
+    # Plot signal with peaks and troughs
     if showPlot:
-        # Plot signal with peaks and troughs
         plt.plot(ax_trim.t, ax_trim.u, label="ax")
         plt.plot(ax_trim.t[peaks], ax_trim.u[peaks], label="peaks")
         plt.plot(ax_trim.t[troughs], ax_trim.u[troughs], label="troughs")
@@ -301,57 +352,61 @@ def plot_natural_freq(ax, T_values):
         plt.ylabel('Acceleration ax [m/s²]')
         plt.grid()
         plt.legend()
+        if showPlot:
+            print("\tPLOT - natural_freq - 1")
         plt.show()
 
         # Histogram of T values
+        T_mean = np.mean(T_values)
         plt.hist(T_values, bins=100, edgecolor='black')
-        plt.title('Histogram of periods T between peaks (ax signal)')
+        plt.plot([T_mean, T_mean], [0, 50], label=f'T_mean={T_mean:.3f}', color='red')
+        plt.title(f'Histogram of periods T between peaks/troughs (ax signal)')
         plt.xlabel('Period T [s]')
         plt.ylabel('Frequency')
+        plt.legend()
         plt.grid()
         if saveFig:
             plt.savefig("Figures/Q1.4_Histogram_T_values_from_ax.png")
         plt.show()
 
 
-def compute_experimental_signals_on_dtVal(ax, vx, ux, dt_val):
+def compute_experimental_signals_on_dtVal(ax, vx, ux, dt_val, showPlot):
     """Estimate damping ratio xi using logarithmic decrement method."""
     # ===== 1. Experimental data =====
     # ----- 1. Trim the signals to [cleaning_t0, cleaning_tf] -----
-    [ax_trim, vx_trim, ux_trim] = clean_signals([ax, vx, ux], cleaning_t0, cleaning_tf, 0.001)
-    ax_trim.t = ax_trim.t - ax_trim.t[0]  # Rebase time to 0
-    vx_trim.t = vx_trim.t - vx_trim.t[0]
-    ux_trim.t = ux_trim.t - ux_trim.t[0]
+    [ax_clean, vx_clean, ux_clean] = clean_signals([ax, vx, ux], cleaning_t0, cleaning_tf, 0.001)
+    ax_clean.t = ax_clean.t - ax_clean.t[0]  # Rebase time to 0
+    vx_clean.t = vx_clean.t - vx_clean.t[0]
+    ux_clean.t = ux_clean.t - ux_clean.t[0]
 
     # ----- 2. Save old signals for comparison -----
-    old_ax = ax_trim.copy()
-    old_vx = vx_trim.copy()
-    old_ux = ux_trim.copy()
+    old_ax = ax_clean.copy()
+    old_vx = vx_clean.copy()
+    old_ux = ux_clean.copy()
 
     # ----- 3. Shift the signal so that the th and exp signals start at the same time  -----
     T_guess = T_th  # estimated period (here ~0.41 [s])
     min_distance = int(0.8 * T_guess / dt)  # at least 80% of T between 2 pics
 
     # ----- 3.1 Shift signal ax (begin at first troughs) -----
-    troughs, _ = sc.find_peaks(-ax_trim.u, distance=min_distance, prominence=0.05)
+    troughs, _ = sc.find_peaks(-ax_clean.u, distance=min_distance, prominence=0.05)
     first_trough_ax = troughs[0]
-    ax_trim.u = ax_trim.u[first_trough_ax:]
-    ax_trim.t = ax_trim.t[first_trough_ax:]
-    ax_trim.t = ax_trim.t - ax_trim.t[0]  # Rebase time to 0
+    ax_clean.u = ax_clean.u[first_trough_ax:]
+    ax_clean.t = ax_clean.t[first_trough_ax:]
+    ax_clean.t = ax_clean.t - ax_clean.t[0]  # Rebase time to 0
 
     # ----- 3.2 Shift signal vx (begin at first troughs of ax) -----
-    vx_trim.u = vx_trim.u[first_trough_ax:]
-    vx_trim.t = vx_trim.t[first_trough_ax:]
-    vx_trim.t = vx_trim.t - vx_trim.t[0]
+    vx_clean.u = vx_clean.u[first_trough_ax:]
+    vx_clean.t = vx_clean.t[first_trough_ax:]
+    vx_clean.t = vx_clean.t - vx_clean.t[0]
 
     # ----- 3.3 Shift signal ux (begin at first troughs of ax) -----
-    ux_trim.u = ux_trim.u[first_trough_ax:]
-    ux_trim.t = ux_trim.t[first_trough_ax:]
-    ux_trim.t = ux_trim.t - ux_trim.t[0]
+    ux_clean.u = ux_clean.u[first_trough_ax:]
+    ux_clean.t = ux_clean.t[first_trough_ax:]
+    ux_clean.t = ux_clean.t - ux_clean.t[0]
 
     # ----- 4 Trim the signals to [0, dt_val] -----
-    # dt_val = 5
-    [ax_t20, vx_t20, ux_t20] = clean_signals([ax_trim, vx_trim, ux_trim], 0, dt_val, 0.001)
+    [ax_t20, vx_t20, ux_t20] = clean_signals([ax_clean, vx_clean, ux_clean], 0, dt_val, 0.001)
     [old_ax, old_vx, old_ux] = clean_signals([old_ax, old_vx, old_ux], 0, dt_val, 0.001)
 
     # ----- 5. Check shifted signals -----
@@ -402,7 +457,7 @@ def plot_free_undamped_syst_comparison(ax_t20, vx_t20, ux_t20, omega, dt_val, u0
     # ----- Plotting comparison theory (with omega) and experiment -----
     if showPlot:
         fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(8, 6))
-        axes[0].set_title(f'Free undamped system:\nComparison theorical(omega={omega:.3f}) - experimental response')
+        axes[0].set_title(f'Free undamped system:\nComparison theorical (omega={omega:.3f}) - experimental response')
 
         # Plot 3 pairs of signals (th vs exp)
         axes[0].plot(ax_t20.t, ax_t20.u, label="ax_exp", color='purple', lw=1)
@@ -426,7 +481,7 @@ def plot_free_undamped_syst_comparison(ax_t20, vx_t20, ux_t20, omega, dt_val, u0
         plt.tight_layout()
         plt.subplots_adjust(hspace=0.3)  # space between plot
         if saveFig:
-            plt.savefig("Figures/Q1.4_Free_undamped_response_comparison.png")
+            plt.savefig(f"Figures/Q1.4_Free_undamped_response_comparison_(omega={omega:2f}).png")
         plt.show()
 
     return a_th, v_th, u_th
@@ -439,33 +494,42 @@ def plot_free_undamped_syst_comparison(ax_t20, vx_t20, ux_t20, omega, dt_val, u0
 def get_damping_coeff(ax, peaks, troughs):
     """Calcule le rapport d’amortissement ξ par la méthode du décrément logarithmique.
     Utilise les maxima et minima du signal pour plus de robustesse."""
-    [ax_trim] = clean_signals([ax], cleaning_t0, cleaning_tf, 0.001)
 
-    delta_peaks = np.zeros(len(peaks) - 1)
-    delta_troughs = np.zeros(len(troughs) - 1)
-    for i in range(len(peaks) - 1):
-        delta_peaks[i] = np.log(abs(ax_trim.u[peaks[i]]) / abs(ax_trim.u[peaks[i + 1]]))
-        delta_troughs[i] = np.log(abs(ax_trim.u[troughs[i]]) / abs(ax_trim.u[troughs[i + 1]]))
+    n_peaks = len(peaks)
+    n_troughs = len(troughs)
+
+    delta_peaks = np.zeros(n_peaks)
+    delta_troughs = np.zeros(n_troughs)
+
+    for i in range(n_peaks - 1):
+        delta_peaks[i] = np.log(abs(ax.u[peaks[i]]) / abs(ax.u[peaks[i + 1]]))
+
+    for i in range(n_troughs - 1):
+        delta_troughs[i] = np.log(abs(ax.u[troughs[i]]) / abs(ax.u[troughs[i + 1]]))
 
     xi_peaks = delta_peaks / (2 * np.pi)
     xi_troughs = delta_troughs / (2 * np.pi)
     xi_peaks_mean = np.mean(xi_peaks)
     xi_troughs_mean = np.mean(xi_troughs)
 
-    xi = np.mean([xi_peaks_mean, xi_troughs_mean])
+    xi_mean = np.mean([xi_peaks_mean, xi_troughs_mean])
 
     print(f"Estimated damping ratio xi from peaks: {xi_peaks_mean}")
     print(f"Estimated damping ratio xi from troughs: {xi_troughs_mean}")
 
-    return xi, xi_peaks, xi_troughs
+    return xi_mean, xi_peaks, xi_troughs
 
 
 def plot_hist_xi(xi_peaks, xi_troughs):
     """Plot histogram of damping ratios estimated from peaks and troughs."""
+    xi_values = np.concatenate([xi_peaks, xi_troughs])
+    xi_mean = np.mean(xi_values)
     if showPlot:
         # Histogram of xi values for peaks and troughs
-        plt.hist(xi_peaks, bins=100, edgecolor='black', label="xi_peaks")
-        plt.hist(xi_troughs, bins=100, edgecolor='black', label="xi_troughs")
+        plt.plot([xi_mean, xi_mean], [0, 50], label=f'xi_mean={xi_mean:.5f}', color='red')
+        plt.hist(xi_values, bins=100, edgecolor='black')
+        # plt.hist(xi_peaks, bins=100, edgecolor='black', label="xi_peaks")
+        # plt.hist(xi_troughs, bins=100, edgecolor='black', label="xi_troughs")
 
         plt.title('Histogram of damping ratio xi')
         plt.xlabel('Damping ratio xi []')
@@ -524,8 +588,6 @@ def plot_damped_response(ax, vx, ux, a_th, v_th, u_th, T):
     Compare experimental and theoretical damped system responses.
     Displays acceleration, velocity, displacement vs time.
     """
-    t_over_T = ux.t / T
-
     if showPlot:
         fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(8, 6))
         axes[0].set_title('Damped system:\nComparison theorical - experimental response')
@@ -553,10 +615,10 @@ def plot_damped_response(ax, vx, ux, a_th, v_th, u_th, T):
 
 
 # ========== PARAMETERS ==========
-showPlot = True
-saveFig = True
-cleaning_t0 = 10.5  # Start time to remove the first unstable oscillations
-cleaning_tf = 115  # End time to remove the last oscillations to get a better mean valueµ
+showPlot = False
+saveFig = False
+cleaning_t0 = 8.7  # Start time to remove the first unstable oscillations
+cleaning_tf = 120  # End time to remove the last oscillations to get a better mean valueµ
 
 dt = 1 / 1024  # [s]
 fs = 1024  # [Hz]
@@ -572,9 +634,17 @@ omega_th = 15.360501352872701  # [rad/s]
 f_th = 2.4446997186794364  # [Hz]
 T_th = 0.409048192037333  # [s]
 
-# ========== RETREIVE DATA ==========
+params_Part1 = {"k": k,
+                "omega": omega_th,
+                "f": f_th,
+                "T": T_th,
+                "xi": None}
 
-print("Begin")
+print("============================")
+print("========== PART 1 ==========")
+print("============================")
+
+# ========== RETREIVE DATA ==========
 
 data = read_data("Free vibration_4 blocks.csv")
 columns = data.columns
@@ -598,45 +668,65 @@ print(f"Theoretical natural frequency: f_th = {f_th} [Hz] ; T_th = {T_th} [s] ; 
 # ========== Q1.2 Compute displacement, ux and u0 ==========
 print("\n=== Q1.2 ===")
 
-ax_filter, vx_filter, ux_filter = get_ux(data, True)  # retrieve filter signals
-ax_nonFilter, vx_nonFilter, ux_nonFilter = get_ux(data, False)
+# ----- 1. Choose which signal we will work with (with/without filter) + Calibrate the trimming limits -----
+ax_filter, vx_filter, ux_filter = get_ux(data, optionFilter=True)  # retrieve filter signals
+ax_nonFilter, vx_nonFilter, ux_nonFilter = get_ux(data, optionFilter=False)
+plot_comparison_with_without_filter(ax_filter, vx_filter, ux_filter, ax_nonFilter, vx_nonFilter, ux_nonFilter)
 
-ax, vx, ux = ax_filter, vx_filter, ux_filter  # Choose which signal we keep
-plot_signals(ax, vx, ux)
+ax_chosen, vx_chosen, ux_chosen = ax_filter, vx_filter, ux_filter  # Choose which signal we keep
+print(f"Trimming time for the signal ax: from {cleaning_t0} [s] to {cleaning_tf} [s]")
 
-u0, u_trim = get_u0(ux)
-plot_u0(ux, u_trim)
+title = "Chosen signals"
+plot_signals(ax_chosen, vx_chosen, ux_chosen, title)
+
+# ----- 2. Determine u0 -----
+u0, u_trim, t0_trim, tf_trim = get_u0(ux_chosen)
+plot_u0(u0, ux_chosen, u_trim)
+
+# ----- 3. Update trimming limits & compute final trimmed signals
+cleaning_t0 = t0_trim  # Update cleaning _t0
+cleaning_tf = tf_trim  # Update cleaning _tf
+
+[ax, vx, ux] = clean_signals([ax_chosen, vx_chosen, ux_chosen], cleaning_t0, cleaning_tf, 0.001)
+title = "Free vibration response"
+plot_signals(ax, vx, ux, title)
+
 print(f"Estimated u0: {u0} [m]")
-print(f"Trimming time for the signal: from {cleaning_t0} [s] to {cleaning_tf} [s]")
+print(f"Final trimming time for the signals: from {cleaning_t0} [s] to {cleaning_tf} [s]")
 
 # ========== Q1.4 Free undamped system responce ==========
 print("\n=== Q1.4 ===")
 
-# ----- Get natural frequency from experimental signal -----
+# ----- 1. Get natural frequency from experimental signal -----
 Tn, T_values, peaks, troughs = get_natural_frequency(ax)
 fn = 1.0 / Tn
 omega_n = 2 * np.pi / Tn
 print(f"Estimated natural frequency: {fn} [Hz] ; Tn = {Tn} [s] ; omega_n = {omega_n} [rad/s]")
-plot_natural_freq(ax, T_values)
+plot_natural_freq(ax, T_values, peaks, troughs)
 
-# ----- Compute experimental signals on a dt_val time window -----
-dt_val = 5  # [s]
-ax_t20, vx_t20, ux_t20 = compute_experimental_signals_on_dtVal(ax, vx, ux, dt_val)
+# ----- 2. Compute experimental signals on a dt_val (20s) time window -----
+dt_val = 20  # [s]
+ax_t20, vx_t20, ux_t20 = compute_experimental_signals_on_dtVal(ax, vx, ux, dt_val, showPlot=False)
 # Plotting comparison theory (with omega_th) and experiment
-plot_free_undamped_syst_comparison(ax_t20, vx_t20, ux_t20, omega_th, dt_val, u0)
+plot_free_undamped_syst_comparison(ax_t20, vx_t20, ux_t20, omega_th, dt_val, u0, saveFig)
 # Plotting comparison theory (with omega_n) and experiment
-plot_free_undamped_syst_comparison(ax_t20, vx_t20, ux_t20, omega_n, dt_val, u0)
+plot_free_undamped_syst_comparison(ax_t20, vx_t20, ux_t20, omega_n, dt_val, u0, saveFig)
 
 # Choose which frequency to keep for the rest of the exercice
 a_undamped_th, v_undamped_th, u_undamped_th = plot_free_undamped_syst_comparison(ax_t20, vx_t20, ux_t20, omega_n,
-                                                                                 dt_val, u0, saveFig=True)
+                                                                                 dt_val, u0, saveFig)
 
 # ========== Q1.5 Damping coefficient ==========
 print("\n=== Q1.5 ===")
 
-xi, xi_peaks, xi_troughs = get_damping_coeff(ax, peaks, troughs)
+xi_mean, xi_peaks, xi_troughs = get_damping_coeff(ax, peaks, troughs)
 plot_hist_xi(xi_peaks, xi_troughs)
+xi = xi_mean
+c_c = 2 * m * omega_n  # critical damping [kg*m/s]
+c = xi * c_c  # damping coeff [kg*m/s]
 print(f"Estimated damping ratio: xi = {xi}")
+print(f"Critical damping coefficient (with omega_n), c_c: {c_c}")
+print(f"Damping coefficient (with omega_n), c: {c}")
 
 # ========== Q1.6 Undamped-syst responce ==========
 print("\n=== Q1.6 ===")
@@ -644,5 +734,12 @@ print("\n=== Q1.6 ===")
 a_damped_th, v_damped_th, u_damped_th = damped_response(dt_val, xi, omega_n, u0, v0=0.0)
 plot_damped_response(ax_t20, vx_t20, ux_t20, a_damped_th, v_damped_th, u_damped_th, Tn)
 
-print("\nEnd")
+# ========== SAVE PARAMETERS PART 1 ==========
+params_Part1["omega"] = omega_n
+params_Part1["T"] = Tn
+params_Part1["f"] = fn
+params_Part1["xi"] = xi
+
+print("\nEND, Parameters saved for Part 1:")
+
 
