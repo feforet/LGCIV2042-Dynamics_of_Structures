@@ -107,3 +107,5 @@ for key, dt in dts.items():
     udotdot_s[key] = udotdot_
 
 plot_u_g_and_derivatives(timestamps, u_s, udot_s, udotdot_s)
+
+print(dts.keys())
