@@ -638,7 +638,8 @@ params_Part1 = {"k": k,
                 "omega": omega_th,
                 "f": f_th,
                 "T": T_th,
-                "xi": None}
+                "xi": None,
+                "c": None}
 
 print("============================")
 print("========== PART 1 ==========")
@@ -739,6 +740,7 @@ params_Part1["omega"] = omega_n
 params_Part1["T"] = Tn
 params_Part1["f"] = fn
 params_Part1["xi"] = xi
+params_Part1["c"] = c
 
 print("\nEND, Parameters saved for Part 1:")
 
