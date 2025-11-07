@@ -1,15 +1,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.signal import fftconvolve
 
 
 import Part1_Free_vibration as part1
+from Part1_Free_vibration import Signal
 import part_2_1 as part21
 
 
 
 def processing_data_exp(data_ks, ks):
     m = len(data_ks)
-    signals_exp = np.zeros(shape=m, dtype=part1.Signal)
+    signals_exp = np.zeros(shape=m, dtype=Signal)
     data_exp_length = np.zeros(m)
     for i in range(len(data_ks)):
         data_exp_length[i] = ks[i]['end'] - ks[i]['start']
@@ -18,7 +20,7 @@ def processing_data_exp(data_ks, ks):
         a = np.array(data_ks[i]['x'])
         t = t - t[0]
 
-        signal_a_exp = part1.Signal(a, t)
+        signal_a_exp = Signal(a, t)
         signals_exp[i] = signal_a_exp
 
     return signals_exp, data_exp_length
@@ -44,15 +46,15 @@ def analytic_steady_state(k, n, t_max):
     disp =  (p0/k) * Rd * np.sin(omega_bar*t - phi)
     acc = - (p0/m) * Ra * np.sin(omega_bar*t - phi)
 
-    u_th = part1.Signal(disp, t)
-    a_th = part1.Signal(acc, t)
+    u_th = Signal(disp, t)
+    a_th = Signal(acc, t)
 
     return u_th, a_th
 
 def plot_analytic_steady_state(k_val, n, t_max, colours):
     m = len(k_val)
-    us_th = np.zeros(shape=m, dtype=part1.Signal)
-    as_th = np.zeros(shape=m, dtype=part1.Signal)
+    us_th = np.zeros(shape=m, dtype=Signal)
+    as_th = np.zeros(shape=m, dtype=Signal)
     for i in range(m):
         k = k_val[i]
         omega_bar = k * omega
@@ -123,15 +125,89 @@ def plot_compare_th_exp(k_val, data_exp, data_exp_length, colours):
 
 
 
+def Duhamel(a0, tp, n, t_max):
+    amplitude = a0 * g
+    t = np.linspace(0, t_max, n)
+
+
+    # 1. Build ground acceleration a_g of the two-sided acceleration impulse
+    a_g = np.zeros_like(t)
+    T_ag = 3*tp
+    for i in range(len(t)):
+        phase = t[i] % T_ag
+        if phase < tp:
+            a_g[i] = +amplitude
+        elif phase >= tp:
+            a_g[i] = -amplitude/2
+    p_g = m * a_g
+
+    # 2. Duhamel integral
+    omega_d = omega * np.sqrt(1-xi**2)
+    s = np.arange(0, len(t)) * dt
+    # 2.1 Unit impulse-response function
+    h = (1/(m*omega_d)) * np.exp(-xi*omega*s) * np.sin(omega_d*s)
+    h[0] = 0
+
+    # 2.2 Convolution: u(t) = - ∫0^t h(t-τ) p_g(τ) dτ
+    u_rel = -dt * fftconvolve(p_g, h)[:len(t)]
+
+    # 3. Compute relative velocity & acceleration
+    v_rel = np.gradient(u_rel, dt)
+    a_rel = np.gradient(v_rel, dt)
+
+    # 4. Compute absolute acceleration
+    a_abs = a_g + a_rel
+
+    signal_a_abs = Signal(a_abs, t)
+    signal_a_g = Signal(a_g, t)
+    signal_a_rel = Signal(a_rel, t)
+    signal_v_rel = Signal(v_rel, t)
+    signal_u_rel = Signal(u_rel, t)
+
+    return signal_a_abs, signal_a_g, signal_a_rel, signal_v_rel, signal_u_rel
+
+def plot_Duhamel(a_abs, a_g, a_rel, v_rel, u_rel):
+    # Plot application of Duhamel'integral
+    if showPlot2:
+        fig, axes = plt.subplots(nrows=5, ncols=1, figsize=(8, 8))
+        axes[0].set_title(f"Signals computed using Duhamel's integral")
+
+        axes[0].plot(a_abs.t, a_abs.u, label="a_abs", color='purple', lw=1)
+        axes[1].plot(a_g.t,   a_g.u,   label="a_g",   color='brown',  lw=0.8, ls='--')
+        axes[2].plot(a_rel.t, a_rel.u, label="a_rel", color='orange', lw=0.8, ls='--')
+        axes[3].plot(v_rel.t, v_rel.u, label="v_rel", color='green',  lw=1)
+        axes[4].plot(u_rel.t, u_rel.u, label="u_rel", color='blue',   lw=1)
+
+        axes[-1].set_xlabel("Time, t [s]")
+        for axe in axes:
+            axe.set_xlim(left=0)
+            axe.legend(loc='upper right')
+            axe.grid()
+
+        plt.tight_layout()
+        plt.subplots_adjust(hspace=0.3)  # space between plot
+        if saveFig2:
+            plt.savefig(f"{repository}/Q2.3_Duhamel_response.png")
+        plt.show()
+
+    return
+
+
+
+
 # ========== PARAMETERS ==========
 repository = "Figures"
-showPlot2 = False
+showPlot2 = True
 saveFig2 = False
 
 g = 9.81  # [m/s²]
 a_g0 = 0.1 * g
 
+tp = 0.1  # time of pulse diff
+a0 = 0.075 # Amplitude of the two-sided impulse
+
 # Retrieved parameters from Part 1 and Part 2.1
+dt = part1.dt
 k = part1.k
 m = part1.m
 omega = part21.omega_n_exp  # take natural frequency from the experimental signal (Q2.1)
@@ -164,7 +240,12 @@ plot_compare_th_exp(k_val, signals_exp, data_exp_length, colours)
 
 # ========== Q2.3 Duhamel’s integral ==========
 print("\n=== Q2.3 ===")
+print(f"Impulse amplitude, a0 = {a0} [g] ; Impulse period, tp = {tp} [s]")
 
+t_max = 40 #[s]
+n = 500
+a_abs, a_g, a_rel, v_rel, u_rel = Duhamel(a0, tp, n, t_max)
+plot_Duhamel(a_abs, a_g, a_rel, v_rel, u_rel)
 
 
 
