@@ -9,7 +9,10 @@ import scipy.signal as sc
 ####  Constants  ####
 #####################
 
-displayPlots = True
+displayPlots = False
+
+if __name__ == "__main__":
+    displayPlots = True
 
 omega_n_exp = 2.169491525423729
 omega_n_theo = p11.omega_n()

@@ -125,7 +125,7 @@ def plot_compare_th_exp(k_val, data_exp, data_exp_length, colours):
 
 # ========== PARAMETERS ==========
 repository = "Figures"
-showPlot2 = True
+showPlot2 = False
 saveFig2 = False
 
 g = 9.81  # [m/s²]
