@@ -7,11 +7,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import part_1_1 as p11
+import Part1_Free_vibration as p1_123456
 
 g = 9.81
 end_time = 40.0
 
-c = 0.001256421782425465
+c = p1_123456.params_Part1['c']
 
 dts_tmp = [p11.T_n()/50, p11.T_n()/25, p11.T_n()/5, p11.T_n()/2]
 dts = {str(dt): dt for dt in dts_tmp}
