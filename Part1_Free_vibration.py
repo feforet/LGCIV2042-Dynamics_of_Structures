@@ -441,9 +441,7 @@ def compute_experimental_signals_on_dtVal(ax, vx, ux, dt_val, showPlot):
 
     return ax_t20, vx_t20, ux_t20
 
-
-def plot_free_undamped_syst_comparison(ax_t20, vx_t20, ux_t20, omega, dt_val, u0, v0=0.0, saveFig=False):
-    """Compute theorical response (with omega given) & compare therical-experiment ax, vx, ux"""
+def free_undamped_response(omega, dt_val,  u0, v0=0.0):
     # ----- Theoretical response of free undamped system -----
     t = np.linspace(0, dt_val, len(ux_t20))
     u = u0 * np.cos(omega * t) + (v0 / omega) * np.sin(omega * t)
@@ -453,6 +451,13 @@ def plot_free_undamped_syst_comparison(ax_t20, vx_t20, ux_t20, omega, dt_val, u0
     a_th = Signal(a, t)
     v_th = Signal(v, t)
     u_th = Signal(u, t)
+
+    return a_th, v_th, u_th
+
+def plot_free_undamped_syst_comparison(ax_t20, vx_t20, ux_t20, omega, dt_val, u0, v0=0.0, saveFig=False):
+    """Compute theorical response (with omega given) & compare therical-experiment ax, vx, ux"""
+    # ----- Theoretical response of free undamped system -----
+    a_th, v_th, u_th = free_undamped_response(omega, dt_val, u0, v0)
 
     # ----- Plotting comparison theory (with omega) and experiment -----
     if showPlot:
@@ -666,6 +671,7 @@ print(f"Density: rho = {rho} kg/m³ ; Mass: m = {m} [kg] ; Length: L = {L} [m] ;
 print(f"Stiffness: k = {k} [N/m]")
 print(f"Theoretical natural frequency: f_th = {f_th} [Hz] ; T_th = {T_th} [s] ; omega_th = {omega_th} [rad/s]")
 
+
 # ========== Q1.2 Compute displacement, ux and u0 ==========
 print("\n=== Q1.2 ===")
 
@@ -695,6 +701,7 @@ plot_signals(ax, vx, ux, title)
 print(f"Estimated u0: {u0} [m]")
 print(f"Final trimming time for the signals: from {cleaning_t0} [s] to {cleaning_tf} [s]")
 
+
 # ========== Q1.4 Free undamped system responce ==========
 print("\n=== Q1.4 ===")
 
@@ -714,8 +721,8 @@ plot_free_undamped_syst_comparison(ax_t20, vx_t20, ux_t20, omega_th, dt_val, u0,
 plot_free_undamped_syst_comparison(ax_t20, vx_t20, ux_t20, omega_n, dt_val, u0, saveFig)
 
 # Choose which frequency to keep for the rest of the exercice
-a_undamped_th, v_undamped_th, u_undamped_th = plot_free_undamped_syst_comparison(ax_t20, vx_t20, ux_t20, omega_n,
-                                                                                 dt_val, u0, saveFig)
+a_undamped_th, v_undamped_th, u_undamped_th = free_undamped_response(omega_n, dt_val, u0)
+
 
 # ========== Q1.5 Damping coefficient ==========
 print("\n=== Q1.5 ===")
@@ -729,11 +736,13 @@ print(f"Estimated damping ratio: xi = {xi}")
 print(f"Critical damping coefficient (with omega_n), c_c: {c_c}")
 print(f"Damping coefficient (with omega_n), c: {c}")
 
+
 # ========== Q1.6 Undamped-syst responce ==========
 print("\n=== Q1.6 ===")
 
 a_damped_th, v_damped_th, u_damped_th = damped_response(dt_val, xi, omega_n, u0, v0=0.0)
 plot_damped_response(ax_t20, vx_t20, ux_t20, a_damped_th, v_damped_th, u_damped_th, Tn)
+
 
 # ========== SAVE PARAMETERS PART 1 ==========
 params_Part1["omega"] = omega_n
