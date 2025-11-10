@@ -18,7 +18,7 @@ dts = {str(dt): dt for dt in dts_tmp}
 
 u_dot_dot_g = lambda t: 0.1 * g * np.sin(p11.omega_n() * t)
 u_dot_g = lambda t: -0.1 * g / p11.omega_n() * (np.cos(p11.omega_n() * t))
-u_g = lambda t: -0.1 * g / p11.omega_n()**2 * (np.sin(p11.omega_n() * t))
+u_g = lambda t: -0.1 * g / (p11.omega_n()**2) * (np.sin(p11.omega_n() * t))
 discretize = lambda dt: np.arange(0, end_time+dt, dt)
 
 timestamps = {key: discretize(dt) for key, dt in dts.items()}
