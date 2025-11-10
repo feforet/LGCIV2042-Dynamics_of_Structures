@@ -2,14 +2,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from Part1_Free_vibration import damped_response
+import Part1_Free_vibration as p1_23456
 import part_1_1 as p1_1
 import part_2_1 as p2_1
 import Part_22_23 as p2_23
 
 
-omega_n = p1_1.omega_n()  # TODO prendre la valeur expérimentale
-c = 0.001256421782425465
-u0 = 0.0674980212979444
+omega_n = p1_23456.omega_n
+c = p1_23456.params_Part1["c"]
+u0 = p1_23456.params_Part1["omega"]
+xi = p1_23456.params_Part1["xi"]
+m = p1_1.m()
 
 
 def compute_fft(signal):
@@ -17,8 +20,12 @@ def compute_fft(signal):
 
 
 def part_4_1():
-    response_1_2 = np.zeros(10)  # TODO prndre le signal de la partie 1.2
-    response_1_3 = np.zeros(10)  # TODO prndre le signal de la partie 1.3
+    dt_val = 40     #[s], time of the computed theorical acceleration
+    # Recorded acceleration signal from 1.2
+    response_1_2 = p1_23456.compute_experimental_signals_on_dtVal(p1_23456.ax, p1_23456.vx, p1_23456.ux, dt_val, showPlot=False)[0].u
+    # Analytical free undamped response from 1.3
+    response_1_3 = p1_23456.free_undamped_response(omega_n, dt_val, u0, v0=0.0)[0].u
+
 
     fft_1_2 = compute_fft(response_1_2)
     fft_1_3 = compute_fft(response_1_3)
@@ -34,10 +41,11 @@ def part_4_1():
 part_4_1()
 
 def part_4_2():
-    response_1_6 = damped_response(60, c, omega_n, u0)[0].u  # TODO prndre le signal de la partie 1.6
-    response_2pcent_damping = damped_response(60, 0.02, omega_n, u0)[0].u
-    response_5pcent_damping = damped_response(60, 0.05, omega_n, u0)[0].u
-    response_10pcent_damping = damped_response(60, 0.1, omega_n, u0)[0].u
+    dt_val = 60
+    response_1_6 = damped_response(dt_val, xi, omega_n, u0)[0].u
+    response_2pcent_damping = damped_response(dt_val, int(0.02/(2*m*omega_n)), omega_n, u0)[0].u
+    response_5pcent_damping = damped_response(dt_val, int(0.05/(2*m*omega_n)), omega_n, u0)[0].u
+    response_10pcent_damping = damped_response(dt_val, int(0.1/(2*m*omega_n)), omega_n, u0)[0].u
 
     fft_1_6 = compute_fft(response_1_6)
     fft_2pcent = compute_fft(response_2pcent_damping)
