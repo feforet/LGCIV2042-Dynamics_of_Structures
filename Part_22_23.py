@@ -35,34 +35,66 @@ def analytic_steady_state(k, n, t_max):
     freq_ratio = omega_bar / omega
 
     p0 = - m * a_g0
-    p_eff = p0 * np.sin(omega_bar * t)
+    a_g = a_g0 * np.sin(omega_bar * t)
+    u_g = - a_g / (omega_bar**2)
+    p_eff = m * a_g
+
     Rd = ( (1-(omega_bar/omega)**2)**2 + (2*xi*(omega_bar/omega))**2 ) **(-1/2)
     Ra = (omega_bar/omega)**2 * Rd
     if freq_ratio == 1:
-        phi = np.pi/2   # 90°
+        phi = np.pi/2   # 90° & arctan(90°) = inf
     else:
-        phi = np.arctan( (2*xi*(omega_bar/omega)) / (1-(omega_bar/omega))**2)
+        phi = np.arctan( (2*xi*(omega_bar/omega)) / (1-(omega_bar/omega)**2))
 
-    disp =  (p0/k) * Rd * np.sin(omega_bar*t - phi)
-    acc = - (p0/m) * Ra * np.sin(omega_bar*t - phi)
+    disp = (p0/k) * Rd * np.sin(omega_bar*t - phi)
+    acc =  (p0/m) * Ra * np.sin(omega_bar*t - phi)
 
     u_th = Signal(disp, t)
     a_th = Signal(acc, t)
 
     return u_th, a_th
 
-def plot_analytic_steady_state(k_val, n, t_max, colours):
+def compute_steady_state_k_val(k_val, n, t_max):
     m = len(k_val)
     us_th = np.zeros(shape=m, dtype=Signal)
     as_th = np.zeros(shape=m, dtype=Signal)
     for i in range(m):
         k = k_val[i]
-        omega_bar = k * omega
         u_th, a_th = analytic_steady_state(k, n, t_max)
         us_th[i] = u_th
         as_th[i] = a_th
 
+    return us_th, as_th
+
+def plot_analytic_steady_state(us_th, as_th, k_val, colours):
+    m = len(k_val)
+
     if showPlot2:
+        # 1. Plot all k_val acceleration signals
+        fig, axes = plt.subplots(nrows=m, ncols=1, figsize=(8, 14))
+
+        for i in range(m):
+            colour = colours[i]
+            k = k_val[i]
+            omega_bar = k * omega
+
+            axes[i].set_title(f'Acceleration for k = {k} & omega_bar = {omega_bar:.2f} [rad/s]')
+            axes[i].plot(as_th[i].t, as_th[i].u, label="a_th", color=colour, lw=1)
+
+        axes[-1].set_xlabel('Time [s]')
+        for axe in axes:
+            axe.set_xlim(left=0)
+            axe.legend(loc='upper right')
+            axe.grid()
+
+        plt.tight_layout()
+        plt.subplots_adjust(hspace=0.3)  # space between plot
+        if saveFig2:
+            plt.savefig(f"{repository}/Q2.2_Steady_state_response.png")
+        plt.show()
+
+
+        # 2. Plot acceleration and displcement for different k_val
         fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(8, 6))
         axes[0].set_title(f'Harmonic loading - analytical response (omega_n = {omega} [rad/s])')
         axes[0].set_xlabel("Time, t [s]")
@@ -83,21 +115,19 @@ def plot_analytic_steady_state(k_val, n, t_max, colours):
         plt.tight_layout()
         plt.subplots_adjust(hspace=0.3)  # space between plot
         if saveFig2:
-            plt.savefig(f"{repository}/Q2.2_Steady_state_response.png")
+            plt.savefig(f"{repository}/Q2.2_Steady_state_response_compare_k_val.png")
         plt.show()
 
     return us_th, as_th
 
 
-def plot_compare_th_exp(k_val, data_exp, data_exp_length, colours):
+def plot_compare_th_exp(k_val, n, data_exp, data_exp_length, colours):
     if len(data_exp) != len(k_val):
         print("ERROR: different length for list u_s, a_s, data_ks")
 
-    n = 500
     m = len(k_val)
     if showPlot2:
         fig, axes = plt.subplots(nrows=m, ncols=1, figsize=(8, 12))
-        axes[0].set_title('Harmonic loading - comparison of the acceleration response')
 
         for i in range(m):
             colour = colours[i]
@@ -126,36 +156,37 @@ def plot_compare_th_exp(k_val, data_exp, data_exp_length, colours):
 
 
 def Duhamel(a0, tp, n, t_max):
+    # 1. Compute the time from 0 to t_max
     amplitude = a0 * g
     t = np.linspace(0, t_max, n)
 
 
-    # 1. Build ground acceleration a_g of the two-sided acceleration impulse
+    # 2. Build ground acceleration a_g of the two-sided acceleration impulse
     a_g = np.zeros_like(t)
     T_ag = 3*tp
-    for i in range(len(t)):
+    for i in range(n):
         phase = t[i] % T_ag
-        if phase < tp:
+        if t[i] % T_ag < tp:
             a_g[i] = +amplitude
         elif phase >= tp:
             a_g[i] = -amplitude/2
     p_g = m * a_g
 
-    # 2. Duhamel integral
+    # 3. Duhamel integral
     omega_d = omega * np.sqrt(1-xi**2)
-    s = np.arange(0, len(t)) * dt
-    # 2.1 Unit impulse-response function
+    s = np.arange(0, n) * dt # interval (t - τ)
+    # 3.1 Unit impulse-response function
     h = (1/(m*omega_d)) * np.exp(-xi*omega*s) * np.sin(omega_d*s)
     h[0] = 0
 
-    # 2.2 Convolution: u(t) = - ∫0^t h(t-τ) p_g(τ) dτ
-    u_rel = -dt * fftconvolve(p_g, h)[:len(t)]
+    # 3.2 Convolution: u(t) = - ∫0^t h(t-τ) p_g(τ) dτ
+    u_rel = dt * fftconvolve(p_g, h)[:n]
 
-    # 3. Compute relative velocity & acceleration
+    # 4. Compute relative velocity & acceleration
     v_rel = np.gradient(u_rel, dt)
     a_rel = np.gradient(v_rel, dt)
 
-    # 4. Compute absolute acceleration
+    # 5. Compute absolute acceleration
     a_abs = a_g + a_rel
 
     signal_a_abs = Signal(a_abs, t)
@@ -197,29 +228,32 @@ def plot_Duhamel(a_abs, a_g, a_rel, v_rel, u_rel):
 
 # ========== PARAMETERS ==========
 repository = "Figures"
-showPlot2 = True
+showPlot2 = False
 saveFig2 = False
 
 g = 9.81  # [m/s²]
-a_g0 = 0.1 * g
+a_g0 = 0.1 * g # [m/s²]
 
 tp = 0.1  # time of pulse diff
 a0 = 0.075 # Amplitude of the two-sided impulse
+
+if __name__ == "__main__":
+    showPlot2 = True
 
 # Retrieved parameters from Part 1 and Part 2.1
 dt = part1.dt
 k = part1.k
 m = part1.m
-omega = part21.omega_n_exp  # take natural frequency from the experimental signal (Q2.1)
+omega = part1.params_Part1["omega"]  # take natural frequency computed in part 1.4
+T = part1.params_Part1["T"]
 xi = part1.params_Part1["xi"]
 c = part1.params_Part1["c"]
 
-
-print("\n=== Parameters part 1 ===")
-print(f"stiffness, k = {k} [N/m] ; natural freq considered, omega_n = {omega} [rad/s] ; damping ratio, xi = {xi} ; damping coeff, c = {c}")
+print("\n=== Parameters from part 1 ===")
+print(f"natural freq considered, omega_n = {omega} [rad/s] ; natural period, T = {T}")
+print(f"stiffness, k = {k} [N/m] ; damping ratio, xi = {xi} ; damping coeff, c = {c}")
 print(f"Other Parameters: \n"
       f"Peak acceleration, a_g0 = {a_g0}")
-
 
 # Retrieved parameters from Part 2.1
 print("\n=== Parameters part 2.1 ===")
@@ -233,21 +267,22 @@ signals_exp, data_exp_length = processing_data_exp(data_ks, ks)
 print("\n=== Q2.2 ===")
 k_val = [0.5, 0.75, 1, 1.5, 2] # index such that omega_bar = k_val * omega_n
 colours = ['red', 'blue', 'green', 'brown', 'pink']
+t_max = 120
+n = int( (t_max/T) * 10 ) # Nb points for the analytical signals
 
-us_th, as_th = plot_analytic_steady_state(k_val, n=200, t_max=120, colours=colours)
-plot_compare_th_exp(k_val, signals_exp, data_exp_length, colours)
-
+us_th, as_th = compute_steady_state_k_val(k_val, n, t_max)
+plot_analytic_steady_state(us_th, as_th, k_val, colours=colours)
+plot_compare_th_exp(k_val, n, signals_exp, data_exp_length, colours)
 
 # ========== Q2.3 Duhamel’s integral ==========
 print("\n=== Q2.3 ===")
 print(f"Impulse amplitude, a0 = {a0} [g] ; Impulse period, tp = {tp} [s]")
 
-t_max = 40 #[s]
-n = 500
+t_max = 10 #[s]
+n = int( (t_max/tp)*10 )
 a_abs, a_g, a_rel, v_rel, u_rel = Duhamel(a0, tp, n, t_max)
-plot_Duhamel(a_abs, a_g, a_rel, v_rel, u_rel)
+#plot_Duhamel(a_abs, a_g, a_rel, v_rel, u_rel)
 
 
 
 print("\nEnd Part 2")
-
