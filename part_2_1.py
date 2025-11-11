@@ -77,6 +77,8 @@ def find_peaks(data, T_guess):
 ###################
 
 data = read_data("4 masses V2.csv")
+repository = "Figures"
+saveFig = True
 
 if displayPlots:
     plot_raw_data(data)
