@@ -7,7 +7,15 @@ import Part1_Free_vibration as part1
 from Part1_Free_vibration import Signal
 import part_2_1 as part21
 
-
+def remove_idx(lst, idx):
+    new_lst = np.zeros_like(lst, shape=len(lst)-1)
+    i = 0 ; j = 0
+    while i < len(lst):
+        if i != idx:
+            new_lst[j] = lst[i]
+            j += 1
+        i += 1
+    return new_lst
 
 def processing_data_exp(data_ks, ks):
     m = len(data_ks)
@@ -18,6 +26,7 @@ def processing_data_exp(data_ks, ks):
 
         t = np.array(data_ks[i]['time'])
         a = np.array(data_ks[i]['x'])
+        a = a - np.mean(a) # Center signal
         t = t - t[0]
 
         signal_a_exp = Signal(a, t)
@@ -66,7 +75,7 @@ def compute_steady_state_k_val(k_val, n, t_max):
 
     return us_th, as_th
 
-def plot_analytic_steady_state(us_th, as_th, k_val, colours):
+def plot_analytic_steady_state(us_th, as_th, k_val, colours, title=""):
     m = len(k_val)
 
     if showPlot2:
@@ -90,11 +99,11 @@ def plot_analytic_steady_state(us_th, as_th, k_val, colours):
         plt.tight_layout()
         plt.subplots_adjust(hspace=0.3)  # space between plot
         if saveFig2:
-            plt.savefig(f"{repository}/Q2.2_Steady_state_response.png")
+            plt.savefig(f"{repository}/Q2.2_Steady_state_response{title}.png")
         plt.show()
 
 
-        # 2. Plot acceleration and displcement for different k_val
+        # 2. 2 plots of the acceleration and the displcement for different k_val
         fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(8, 6))
         axes[0].set_title(f'Harmonic loading - analytical response (omega_n = {omega} [rad/s])')
         axes[0].set_xlabel("Time, t [s]")
@@ -108,6 +117,7 @@ def plot_analytic_steady_state(us_th, as_th, k_val, colours):
             axes[1].plot(as_th[i].t, as_th[i].u, label=f"k={k_val[i]}", color=colours[i], lw=1)
 
         for axe in axes:
+            axe.set_ylim(top=3, bottom=-3)
             axe.set_xlim(left=0)
             axe.legend(loc='upper right')
             axe.grid()
@@ -115,7 +125,7 @@ def plot_analytic_steady_state(us_th, as_th, k_val, colours):
         plt.tight_layout()
         plt.subplots_adjust(hspace=0.3)  # space between plot
         if saveFig2:
-            plt.savefig(f"{repository}/Q2.2_Steady_state_response_compare_k_val.png")
+            plt.savefig(f"{repository}/Q2.2_Steady_state_response_compare_k_val{title}.png")
         plt.show()
 
     return us_th, as_th
@@ -153,6 +163,21 @@ def plot_compare_th_exp(k_val, n, data_exp, data_exp_length, colours):
             plt.savefig(f"{repository}/Q2.2_compare_steady_state_with_exp.png")
         plt.show()
 
+
+def plot_freq_response_curve_compare_exp_th(k_val, amplitude_th, amplitude_exp, ylim=None, title=""):
+    plt.figure(figsize=(8,6))
+    plt.plot(k_val, amplitude_exp, label="Experimental", color="blue", marker='o')
+    plt.plot(k_val, amplitude_th, label="Theorical", color="orange", marker='o')
+    plt.ylim(0, ylim)
+
+    plt.title("Comparison of the frequency response curve")
+    plt.xlabel(r'Frequancy ratio, \frac{\bar\omega } {\omega}')
+    plt.ylabel('Maximum amplitude')
+    plt.grid()
+    plt.legend()
+    if showPlot2:
+        plt.savefig(f"{repository}/Q2.2_Compare_freq_response_curve{title}.png")
+    plt.show()
 
 
 def Duhamel(a0, tp, n, t_max):
@@ -221,15 +246,13 @@ def plot_Duhamel(a_abs, a_g, a_rel, v_rel, u_rel):
             plt.savefig(f"{repository}/Q2.3_Duhamel_response.png")
         plt.show()
 
-    return
-
 
 
 
 # ========== PARAMETERS ==========
 repository = "Figures"
 showPlot2 = False
-saveFig2 = False
+saveFig2 = True
 
 g = 9.81  # [m/s²]
 a_g0 = 0.1 * g # [m/s²]
@@ -265,14 +288,28 @@ signals_exp, data_exp_length = processing_data_exp(data_ks, ks)
 
 # ========== Q2.2 Analytical steady-state response ==========
 print("\n=== Q2.2 ===")
-k_val = [0.5, 0.75, 1, 1.5, 2] # index such that omega_bar = k_val * omega_n
-colours = ['red', 'blue', 'green', 'brown', 'pink']
-t_max = 120
-n = int( (t_max/T) * 10 ) # Nb points for the analytical signals
 
+k_val = [0.5, 0.75, 1, 1.5, 2] # index such that omega_bar = k_val * omega_n
+colours = ['red', 'magenta', 'orange', 'blue', 'green']
+t_max = 5
+n = int( (t_max/T) * 50 ) # Nb points for the analytical signals
+
+# ----- 1. Calculate steady-state for diff k_val -----
 us_th, as_th = compute_steady_state_k_val(k_val, n, t_max)
-plot_analytic_steady_state(us_th, as_th, k_val, colours=colours)
+
+# ----- 2. Plot steady-state response (acc/disp and all k_val) with and without k=1  -----
+plot_analytic_steady_state(us_th, as_th, k_val, colours=colours, title="")
+plot_analytic_steady_state(remove_idx(us_th, 2), remove_idx(as_th, 2), remove_idx(k_val, 2), colours=remove_idx(colours, 2), title="_without_k3")
+
+# ----- 3. Compare exp and th acceleration response -----
 plot_compare_th_exp(k_val, n, signals_exp, data_exp_length, colours)
+
+# ----- 4. Compute and compare frequency response curve for exp and th response -----
+amplitude_th = [ np.max(as_th[i].u) for i in range(len(as_th)) ]
+amplitude_exp = [ np.max(signals_exp[i].u) for i in range(len(signals_exp)) ]
+plot_freq_response_curve_compare_exp_th(k_val, amplitude_th, amplitude_exp)
+plot_freq_response_curve_compare_exp_th(k_val, amplitude_th, amplitude_exp, ylim=20, title="_without_k3")
+
 
 # ========== Q2.3 Duhamel’s integral ==========
 print("\n=== Q2.3 ===")
@@ -281,7 +318,7 @@ print(f"Impulse amplitude, a0 = {a0} [g] ; Impulse period, tp = {tp} [s]")
 t_max = 10 #[s]
 n = int( (t_max/tp)*10 )
 a_abs, a_g, a_rel, v_rel, u_rel = Duhamel(a0, tp, n, t_max)
-#plot_Duhamel(a_abs, a_g, a_rel, v_rel, u_rel)
+plot_Duhamel(a_abs, a_g, a_rel, v_rel, u_rel)
 
 
 

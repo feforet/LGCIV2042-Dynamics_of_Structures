@@ -353,7 +353,7 @@ def plot_natural_freq(ax, T_values, peaks, troughs):
         plt.grid()
         plt.legend()
         if showPlot:
-            print("\tPLOT - natural_freq - 1")
+            plt.savefig("Figures/Q1.4_peak_throughs.png")
         plt.show()
 
         # Histogram of T values
@@ -645,6 +645,9 @@ params_Part1 = {"k": k,
                 "T": T_th,
                 "xi": None,
                 "c": None}
+
+if __name__ == "__main__":
+    showPlot = True
 
 print("============================")
 print("========== PART 1 ==========")
