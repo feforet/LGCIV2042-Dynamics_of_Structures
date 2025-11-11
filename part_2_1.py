@@ -122,5 +122,5 @@ if displayPlots:
     plt.title('Mean peak amplitude vs k')
     plt.grid()
     if saveFig:
-        plt.savefig(f"{repository}/Q1.2_evolution_peaks_ki.png")
+        plt.savefig(f"{repository}/Q2.2_evolution_peaks_ki.png")
     plt.show()
