@@ -8,14 +8,16 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import part_1_1 as p11
 import Part1_Free_vibration as p1_123456
+import part_2_1 as p2_1
+import Part_22_23 as p2_23
 
 g = 9.81
 end_time = 40.0
 
 c = p1_123456.params_Part1['c']
 
-dts_tmp = [p11.T_n()/50, p11.T_n()/25, p11.T_n()/5, p11.T_n()/2]
-dts = {str(dt): dt for dt in dts_tmp}
+divisors = [50, 25, 5, 2]
+dts = {str(div): p11.T_n()/div for div in divisors}
 
 u_dot_dot_g = lambda t: 0.1 * g * np.sin(p11.omega_n() * t)
 u_dot_g = lambda t: -0.1 * g / p11.omega_n() * (np.cos(p11.omega_n() * t))
@@ -28,32 +30,54 @@ u_gs = {index: u_g(ts) for index, ts in timestamps.items()}
 u_dot_gs = {index: u_dot_g(ts) for index, ts in timestamps.items()}
 u_dot_dot_gs = {index: u_dot_dot_g(ts) for index, ts in timestamps.items()}
 
-def plot_u_g_and_derivatives(timestamps, u, u_dot, u_dot_dot):
-    for key in timestamps.keys():
-        plt.plot(timestamps[key], u[key], label="{}: {}".format(key, dts[key]))
+u_analytic, a_analytic = p2_23.analytic_steady_state(1, n=int(end_time*100), t_max=end_time)
+experimental_response = p2_23.processing_data_exp([p2_1.data_ks[2]], [p2_1.ks[2]])
+
+def plot_u_and_u_dot_dot(timestamps, u, u_dot_dot):
+    plt.plot(u_analytic.t, u_analytic.u, label='Analytical steady-state')
+    plt.plot(timestamps['50'], u['50'], label=f"dt = T_n/50")
+    plt.plot(timestamps['25'], u['25'], label=f"dt = T_n/25")
+    plt.plot(timestamps['5'], u['5'], label=f"dt = T_n/5")
+    plt.ylim(-1.5, 1.5)
     plt.xlabel('Time [s]')
-    plt.ylabel('Ground Displacement [m]')
+    plt.ylabel('Displacement response [m]')
     plt.grid()
     plt.legend()
-    plt.title("Ground Displacement")
+    plt.title("Displacement response U(t)")
+    plt.savefig("Figures/Q3_Displacement_responses.png")
+    plt.show()
+    
+    plt.plot(timestamps['2'], u['2'], label=f"dt = T_n/2")
+    plt.yscale('log')
+    plt.xlabel('Time [s]')
+    plt.ylabel('Displacement response [m]')
+    plt.grid()
+    plt.legend()
+    plt.title("Displacement response U(t) for dt = T_n/2")
+    plt.savefig("Figures/Q3_Displacement_response_dt2.png")
     plt.show()
 
-    for key in timestamps.keys():
-        plt.plot(timestamps[key], u_dot[key], label="{}: {}".format(key, dts[key]))
+    plt.plot(a_analytic.t, a_analytic.u, label='Analytical steady-state')
+    plt.plot(timestamps['50'], u_dot_dot['50'], label=f"dt = T_n/50")
+    plt.plot(timestamps['25'], u_dot_dot['25'], label=f"dt = T_n/25")
+    plt.plot(experimental_response[0][0].t[:40*1024], experimental_response[0][0].u[:40*1024], label='Experimental steady-state')
+    plt.plot(timestamps['5'], u_dot_dot['5'], label=f"dt = T_n/5")
     plt.xlabel('Time [s]')
-    plt.ylabel('Ground Velocity [m/s]')
+    plt.ylabel('Acceleration response [m/s^2]')
     plt.grid()
     plt.legend()
-    plt.title("Ground Velocity")
+    plt.title("Acceleration response U''(t)")
+    plt.savefig("Figures/Q3_Acceleration_responses.png")
     plt.show()
-
-    for key in timestamps.keys():
-        plt.plot(timestamps[key], u_dot_dot[key], label="{}: {}".format(key, dts[key]))
+    
+    plt.plot(timestamps['2'], u_dot_dot['2'], label=f"dt = T_n/2")
+    plt.yscale('log')
     plt.xlabel('Time [s]')
-    plt.ylabel('Ground Acceleration [m/s^2]')
+    plt.ylabel('Acceleration response [m/s^2]')
     plt.grid()
     plt.legend()
-    plt.title("Ground Acceleration")
+    plt.title("Acceleration response U''(t) for dt = T_n/2")
+    plt.savefig("Figures/Q3_Acceleration_response_dt2.png")
     plt.show()
 
 
@@ -91,6 +115,6 @@ for key, dt in dts.items():
     udot_s[key] = udot_
     udotdot_s[key] = udotdot_
 
-plot_u_g_and_derivatives(timestamps, u_s, udot_s, udotdot_s)
+plot_u_and_u_dot_dot(timestamps, u_s, udotdot_s)
 
 print(dts.keys())
