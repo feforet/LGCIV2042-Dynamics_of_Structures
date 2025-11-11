@@ -47,6 +47,8 @@ def plot_raw_data(data):
     plt.ylabel('Acceleration [m/s^2]')
     plt.grid()
     plt.legend()
+    if saveFig:
+        plt.savefig(f"{repository}/Q2.1_raw_recorded_acc.png")
     plt.show()
 
 def plot_acceleration(data, k_i, peaks):
@@ -58,6 +60,8 @@ def plot_acceleration(data, k_i, peaks):
     plt.ylabel('Acceleration [m/s^2]')
     plt.grid()
     plt.legend()
+    if saveFig:
+        plt.savefig(f"{repository}/Q2.1_recorded_acc_k_{k_i['k']}.png")
     plt.show()
 
 def split_data(data, start, end):
@@ -74,6 +78,8 @@ def find_peaks(data, k_i, T_guess):
 ###################
 
 data = read_data("4 masses V2.csv")
+repository = "Figures"
+saveFig = True
 
 if displayPlots:
     plot_raw_data(data)
@@ -115,4 +121,6 @@ if displayPlots:
     plt.ylabel('Mean peak amplitude [m/s^2]')
     plt.title('Mean peak amplitude vs k')
     plt.grid()
+    if saveFig:
+        plt.savefig(f"{repository}/Q1.2_evolution_peaks_ki.png")
     plt.show()
