@@ -36,6 +36,7 @@ def part_4_1():
     plt.xlabel('Frequency')
     plt.ylabel('Magnitude')
     plt.legend()
+    plt.savefig('Figures/Q4.1_FFT_Responses_1.2_1.3.png')
     plt.show()
 
 part_4_1()
@@ -60,6 +61,7 @@ def part_4_2():
     plt.xlabel('Frequency')
     plt.ylabel('Magnitude')
     plt.legend()
+    plt.savefig('Figures/Q4.2_FFT_Responses_Damping.png')
     plt.show()
 
 part_4_2()
