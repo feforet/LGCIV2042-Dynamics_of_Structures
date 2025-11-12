@@ -22,12 +22,17 @@ def processing_data_exp(data_ks, ks):
     signals_exp = np.zeros(shape=m, dtype=Signal)
     data_exp_length = np.zeros(m)
     for i in range(len(data_ks)):
+        k = ks[i]['k']
         data_exp_length[i] = ks[i]['end'] - ks[i]['start']
 
+        # Make the signal begin at t=0
         t = np.array(data_ks[i]['time'])
-        a = np.array(data_ks[i]['x'])
-        a = a - np.mean(a) # Center signal
         t = t - t[0]
+
+        a = np.array(data_ks[i]['x'])
+        # Center signal
+        a = a - np.mean(a)
+        # Remove the ground acceleration part
 
         signal_a_exp = Signal(a, t)
         signals_exp[i] = signal_a_exp
@@ -55,8 +60,8 @@ def analytic_steady_state(k, n, t_max):
     else:
         phi = np.arctan( (2*xi*(omega_bar/omega)) / (1-(omega_bar/omega)**2))
 
-    disp = (p0/k) * Rd * np.sin(omega_bar*t - phi)
-    acc =  (p0/m) * Ra * np.sin(omega_bar*t - phi)
+    disp =  (p0/k) * Rd * np.sin(omega_bar*t - phi)
+    acc = - (p0/m) * Ra * np.sin(omega_bar*t - phi)
 
     u_th = Signal(disp, t)
     a_th = Signal(acc, t)
@@ -104,24 +109,18 @@ def plot_analytic_steady_state(us_th, as_th, k_val, colours, title=""):
 
 
         # 2. 2 plots of the acceleration and the displcement for different k_val
-        fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(8, 6))
-        axes[0].set_title(f'Harmonic loading - analytical response (omega_n = {omega} [rad/s])')
-        axes[0].set_xlabel("Time, t [s]")
-        axes[0].set_ylabel("Displacement, u [m]")
-
-        axes[1].set_xlabel("Time, t [s]")
-        axes[1].set_ylabel("Acceleration, u [m/s²]")
-
+        plt.figure(figsize=(8, 3))
         for i in range(m):
-            axes[0].plot(us_th[i].t, us_th[i].u, label=f"k={k_val[i]}", color=colours[i], lw=1)
-            axes[1].plot(as_th[i].t, as_th[i].u, label=f"k={k_val[i]}", color=colours[i], lw=1)
+            plt.plot(as_th[i].t, as_th[i].u, label=f"k={k_val[i]}", color=colours[i], lw=1)
 
-        for axe in axes:
-            axe.set_ylim(top=3, bottom=-3)
-            axe.set_xlim(left=0)
-            axe.legend(loc='upper right')
-            axe.grid()
+        plt.ylim(top=2.5, bottom=-2.5)
+        plt.xlim(left=0)
 
+        plt.title(f'Harmonic loading - analytical response (omega_n = {omega:.2f} [rad/s])')
+        plt.xlabel("Time, t [s]")
+        plt.ylabel("Acceleration, a [m/s²]")
+        plt.legend(loc='upper right')
+        plt.grid()
         plt.tight_layout()
         plt.subplots_adjust(hspace=0.3)  # space between plot
         if saveFig2:
@@ -171,8 +170,8 @@ def plot_freq_response_curve_compare_exp_th(k_val, amplitude_th, amplitude_exp, 
     plt.ylim(0, ylim)
 
     plt.title("Comparison of the frequency response curve")
-    plt.xlabel(r'Frequancy ratio, \frac{\bar\omega } {\omega}')
-    plt.ylabel('Maximum amplitude')
+    plt.xlabel(r'Frequancy ratio, $\frac{\bar\omega} {\omega}$')
+    plt.ylabel('Maximum peak of the acceleration signal [m/s²]')
     plt.grid()
     plt.legend()
     if showPlot2:
@@ -222,7 +221,7 @@ def Duhamel(a0, tp, n, t_max):
 
     return signal_a_abs, signal_a_g, signal_a_rel, signal_v_rel, signal_u_rel
 
-def plot_Duhamel(a_abs, a_g, a_rel, v_rel, u_rel):
+def plot_Duhamel_steps(a_abs, a_g, a_rel, v_rel, u_rel):
     # Plot application of Duhamel'integral
     if showPlot2:
         fig, axes = plt.subplots(nrows=5, ncols=1, figsize=(8, 8))
@@ -243,10 +242,21 @@ def plot_Duhamel(a_abs, a_g, a_rel, v_rel, u_rel):
         plt.tight_layout()
         plt.subplots_adjust(hspace=0.3)  # space between plot
         if saveFig2:
-            plt.savefig(f"{repository}/Q2.3_Duhamel_response.png")
+            plt.savefig(f"{repository}/Q2.3_Duhamel_response_steps.png")
         plt.show()
 
+def plot_Duhamel_disp(u_rel):
+    plt.figure(figsize=(10, 3))
+    plt.plot(u_rel.t, u_rel.u, label="u_rel", color='blue', lw=1)
 
+    plt.title("Duhamel's response")
+    plt.xlabel("Time, t [s]")
+    plt.ylabel('Displacement, u [m]')
+    plt.grid()
+    plt.legend(loc='upper right')
+    if showPlot2:
+        plt.savefig(f"{repository}/Q2.3_Duhamel_disp.png")
+    plt.show()
 
 
 # ========== PARAMETERS ==========
@@ -296,6 +306,9 @@ n = int( (t_max/T) * 50 ) # Nb points for the analytical signals
 
 # ----- 1. Calculate steady-state for diff k_val -----
 us_th, as_th = compute_steady_state_k_val(k_val, n, t_max)
+us_max = [np.max(us_th[i].u) for i in range(len(us_th))]
+as_max = [np.max(as_th[i].u) for i in range(len(as_th))]
+print(f"Max amplitude us : {np.max(us_max)} and for as : {np.max(as_max)}")
 
 # ----- 2. Plot steady-state response (acc/disp and all k_val) with and without k=1  -----
 plot_analytic_steady_state(us_th, as_th, k_val, colours=colours, title="")
@@ -308,17 +321,17 @@ plot_compare_th_exp(k_val, n, signals_exp, data_exp_length, colours)
 amplitude_th = [ np.max(as_th[i].u) for i in range(len(as_th)) ]
 amplitude_exp = [ np.max(signals_exp[i].u) for i in range(len(signals_exp)) ]
 plot_freq_response_curve_compare_exp_th(k_val, amplitude_th, amplitude_exp)
-plot_freq_response_curve_compare_exp_th(k_val, amplitude_th, amplitude_exp, ylim=20, title="_without_k3")
 
 
 # ========== Q2.3 Duhamel’s integral ==========
 print("\n=== Q2.3 ===")
 print(f"Impulse amplitude, a0 = {a0} [g] ; Impulse period, tp = {tp} [s]")
 
-t_max = 10 #[s]
+t_max = 40 #[s]
 n = int( (t_max/tp)*10 )
 a_abs, a_g, a_rel, v_rel, u_rel = Duhamel(a0, tp, n, t_max)
-plot_Duhamel(a_abs, a_g, a_rel, v_rel, u_rel)
+#plot_Duhamel_steps(a_abs, a_g, a_rel, v_rel, u_rel)
+#plot_Duhamel_disp(u_rel)
 
 
 
