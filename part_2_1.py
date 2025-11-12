@@ -127,10 +127,9 @@ for i, k in enumerate(ks):
     mean_peak = np.mean(peaks_cuts_ks[i][1]) - np.mean(cuts_ks[i]["x"])
     print(f"k = {k['k']}: Mean peak amplitude = {mean_peak:.4f} m/s^2")
 
-if displayPlots:
     k_values = [k["k"] for k in ks]
     mean_peaks = [np.mean(peaks_cuts_ks[i][1]) - np.mean(cuts_ks[i]["x"]) for i in range(len(ks))]
-
+if displayPlots:
     plt.figure()
     plt.plot(k_values, mean_peaks, 'o-')
     plt.xlabel('k')
