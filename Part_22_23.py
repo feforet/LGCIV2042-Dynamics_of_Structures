@@ -17,13 +17,13 @@ def remove_idx(lst, idx):
         i += 1
     return new_lst
 
-def processing_data_exp(data_ks, ks):
+def processing_data_exp(data_ks, ks, t_max):
     m = len(data_ks)
     signals_exp = np.zeros(shape=m, dtype=Signal)
     data_exp_length = np.zeros(m)
     for i in range(len(data_ks)):
         k = ks[i]['k']
-        data_exp_length[i] = ks[i]['end'] - ks[i]['start']
+        data_exp_length[i] = t_max
 
         # Make the signal begin at t=0
         t = np.array(data_ks[i]['time'])
@@ -66,19 +66,21 @@ def analytic_steady_state(k, n, t_max):
     u_th = Signal(disp, t)
     a_th = Signal(acc, t)
 
-    return u_th, a_th
+    return u_th, a_th, Ra
 
 def compute_steady_state_k_val(k_val, n, t_max):
     m = len(k_val)
     us_th = np.zeros(shape=m, dtype=Signal)
     as_th = np.zeros(shape=m, dtype=Signal)
+    Ras = np.zeros(shape=m)
     for i in range(m):
         k = k_val[i]
-        u_th, a_th = analytic_steady_state(k, n, t_max)
+        u_th, a_th, Ra = analytic_steady_state(k, n, t_max)
         us_th[i] = u_th
         as_th[i] = a_th
+        Ras[i] = Ra
 
-    return us_th, as_th
+    return us_th, as_th, Ras
 
 def plot_analytic_steady_state(us_th, as_th, k_val, colours, title=""):
     m = len(k_val)
@@ -144,9 +146,9 @@ def plot_compare_th_exp(k_val, n, data_exp, data_exp_length, colours):
             omega_bar = k * omega
 
             a_exp = data_exp[i]
-            _, a_th = analytic_steady_state(k, n, data_exp_length[i])
+            _, a_th, _ = analytic_steady_state(k, n, data_exp_length[i])
 
-            axes[i].set_title(f'Acceleration for k = {k} & omega_bar = {omega_bar:.2f} [rad/s]')
+            axes[i].set_title(fr'Acceleration for k = {k} & $\bar\omega$ = {omega_bar:.2f} [rad/s]')
             axes[i].plot(a_exp.t, a_exp.u, label="a_exp", color=colour, lw=1)
             axes[i].plot(a_th.t, a_th.u, label="a_th", color='orange', lw=1, ls='--')
 
@@ -194,7 +196,7 @@ def Duhamel(a0, tp, n, t_max):
             a_g[i] = +amplitude
         elif phase >= tp:
             a_g[i] = -amplitude/2
-    p_g = m * a_g
+    p_g = -m * a_g
 
     # 3. Duhamel integral
     omega_d = omega * np.sqrt(1-xi**2)
@@ -221,7 +223,7 @@ def Duhamel(a0, tp, n, t_max):
 
     return signal_a_abs, signal_a_g, signal_a_rel, signal_v_rel, signal_u_rel
 
-def plot_Duhamel_steps(a_abs, a_g, a_rel, v_rel, u_rel):
+def plot_Duhamel_steps(a_abs, a_g, a_rel, v_rel, u_rel, title=""):
     # Plot application of Duhamel'integral
     if showPlot2:
         fig, axes = plt.subplots(nrows=5, ncols=1, figsize=(8, 8))
@@ -242,11 +244,11 @@ def plot_Duhamel_steps(a_abs, a_g, a_rel, v_rel, u_rel):
         plt.tight_layout()
         plt.subplots_adjust(hspace=0.3)  # space between plot
         if saveFig2:
-            plt.savefig(f"{repository}/Q2.3_Duhamel_response_steps.png")
+            plt.savefig(f"{repository}/Q2.3_Duhamel_response_steps{title}.png")
         plt.show()
 
-def plot_Duhamel_disp(u_rel):
-    plt.figure(figsize=(10, 3))
+def plot_Duhamel_disp(u_rel, title=""):
+    plt.figure(figsize=(10, 4))
     plt.plot(u_rel.t, u_rel.u, label="u_rel", color='blue', lw=1)
 
     plt.title("Duhamel's response")
@@ -255,7 +257,7 @@ def plot_Duhamel_disp(u_rel):
     plt.grid()
     plt.legend(loc='upper right')
     if showPlot2:
-        plt.savefig(f"{repository}/Q2.3_Duhamel_disp.png")
+        plt.savefig(f"{repository}/Q2.3_Duhamel_disp{title}.png")
     plt.show()
 
 
@@ -291,10 +293,10 @@ print(f"Other Parameters: \n"
 # Retrieved parameters from Part 2.1
 print("\n=== Parameters part 2.1 ===")
 
-data_ks = part21.data_ks # acceleration signals recorded for each ki
+data_ks = part21.cuts_ks # steady state part of the acceleration signals recorded for each ki
 ks = part21.ks # dico containing start & end of the complet signal for each ki
-signals_exp, data_exp_length = processing_data_exp(data_ks, ks)
-
+signals_exp, data_exp_length = processing_data_exp(data_ks, ks, t_max=20)
+mean_peaks = part21.mean_peaks
 
 # ========== Q2.2 Analytical steady-state response ==========
 print("\n=== Q2.2 ===")
@@ -305,33 +307,41 @@ t_max = 5
 n = int( (t_max/T) * 50 ) # Nb points for the analytical signals
 
 # ----- 1. Calculate steady-state for diff k_val -----
-us_th, as_th = compute_steady_state_k_val(k_val, n, t_max)
+us_th, as_th, Ras = compute_steady_state_k_val(k_val, n, t_max)
 us_max = [np.max(us_th[i].u) for i in range(len(us_th))]
 as_max = [np.max(as_th[i].u) for i in range(len(as_th))]
 print(f"Max amplitude us : {np.max(us_max)} and for as : {np.max(as_max)}")
 
 # ----- 2. Plot steady-state response (acc/disp and all k_val) with and without k=1  -----
-plot_analytic_steady_state(us_th, as_th, k_val, colours=colours, title="")
-plot_analytic_steady_state(remove_idx(us_th, 2), remove_idx(as_th, 2), remove_idx(k_val, 2), colours=remove_idx(colours, 2), title="_without_k3")
+#plot_analytic_steady_state(us_th, as_th, k_val, colours=colours, title="")
+#plot_analytic_steady_state(remove_idx(us_th, 2), remove_idx(as_th, 2), remove_idx(k_val, 2), colours=remove_idx(colours, 2), title="_without_k3")
 
 # ----- 3. Compare exp and th acceleration response -----
-plot_compare_th_exp(k_val, n, signals_exp, data_exp_length, colours)
+#plot_compare_th_exp(k_val, n, signals_exp, data_exp_length, colours)
 
 # ----- 4. Compute and compare frequency response curve for exp and th response -----
 amplitude_th = [ np.max(as_th[i].u) for i in range(len(as_th)) ]
-amplitude_exp = [ np.max(signals_exp[i].u) for i in range(len(signals_exp)) ]
-plot_freq_response_curve_compare_exp_th(k_val, amplitude_th, amplitude_exp)
+amplitude_exp = mean_peaks
+#plot_freq_response_curve_compare_exp_th(k_val, amplitude_th, amplitude_exp)
 
+Ras_th = [ np.max(as_th[i].u / a_g0) for i in range(len(as_th)) ]
+Ras_exp = [ mean_peaks[i] / a_g0 for i in range(len(signals_exp)) ]
+#plot_freq_response_curve_compare_exp_th(k_val, Ras_th, Ras_exp, title="Rd")
+
+
+print(amplitude_th)
+print(Ras_th)
 
 # ========== Q2.3 Duhamel’s integral ==========
 print("\n=== Q2.3 ===")
 print(f"Impulse amplitude, a0 = {a0} [g] ; Impulse period, tp = {tp} [s]")
 
 t_max = 40 #[s]
-n = int( (t_max/tp)*10 )
+fact = 100
+n = int( (t_max/tp)*fact)
 a_abs, a_g, a_rel, v_rel, u_rel = Duhamel(a0, tp, n, t_max)
-#plot_Duhamel_steps(a_abs, a_g, a_rel, v_rel, u_rel)
-#plot_Duhamel_disp(u_rel)
+plot_Duhamel_steps(a_abs, a_g, a_rel, v_rel, u_rel, title=f'_{fact}')
+plot_Duhamel_disp(u_rel, title=f'_{fact}')
 
 
 
